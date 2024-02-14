@@ -1,12 +1,14 @@
-#include<Wire.h>
+#include <Wire.h>
 #include <ESP8266WiFi.h>
-#include <WiFiUdp.h>
+#include <BlynkSimpleEsp8266.h>
+
+char auth[] = "YourAuthToken"; // Your Blynk Auth Token
+char ssid[] = "YourWiFiSSID";  // Your WiFi SSID
+char pass[] = "YourWiFiPassword";  // Your WiFi Password
+
 WiFiUDP UDP;
 char packet[4];
-//IPAddress local_IP(192, 168, 203, 158);
-//IPAddress gateway(192, 168, 1, 158);
-//IPAddress subnet(255, 255, 0, 0);
-//_________________________________________//  
+
 int ESCout_1 ,ESCout_2 ,ESCout_3 ,ESCout_4;
 int input_PITCH = 50;
 int input_ROLL = 50;
@@ -28,7 +30,7 @@ int pulldown_time_temp[] = {0,0,0,0,0};
 int pulldown_time[] = {0,0,0,0,0};
 volatile int pulldown_time_temp_loop[] = {0,0,0,0,0}; //volatile key
 uint8_t pin[] = {14,12,13,15};
-int i,j,temp_i,temp;
+int i,j,temp;
 boolean orderState1,orderState2,orderState3,orderState4,Timer_Init;
 
 int16_t gyro_x, gyro_y, gyro_z, acc_x, acc_y, acc_z, temperature, acc_total_vector;
@@ -51,7 +53,24 @@ double yaw_kp=8;      //5
 double yaw_ki=0;  //0.005
 double yaw_kd=4;      //2.8
 
+BLYNK_WRITE(V0) {
+  int altitude = param.asInt();
+  input_THROTTLE = map(altitude, 0, 1023, 0, 1000);
+}
 
+BLYNK_WRITE(V1) {
+  int pitch = param.asInt();
+  input_PITCH = map(pitch, 0, 1023, 0, 100);
+}
+
+BLYNK_WRITE(V2) {
+  int roll = param.asInt();
+  input_ROLL = map(roll, 0, 1023, 0, 100);
+}
+
+BLYNK_WRITE(V3) {
+  Mode = param.asInt();
+}
 
 void ICACHE_RAM_ATTR PWM_callback() {
   switch (pwm_stops){
@@ -88,19 +107,14 @@ void ICACHE_RAM_ATTR PWM_callback() {
   }
 }
 
-
 void setup() {
-pinMode(D5,OUTPUT);pinMode(D6,OUTPUT);pinMode(D7,OUTPUT);pinMode(D8,OUTPUT);pinMode(D0,OUTPUT); 
-GPOC = (1 << 14);GPOC = (1 << 12);GPOC = (1 << 13);GPOC = (1 << 15);
-digitalWrite(D0,LOW); 
-Serial.begin(115200);
-WiFi.mode(WIFI_STA);
-WiFi.begin("Redmi_R", "deywifi3210");
-while (WiFi.status() != WL_CONNECTED){ delay(500);}
-Serial.println(WiFi.localIP()); 
-UDP.begin(9999);
-delay(6000);
-//____________________________________________________________________// 
+  pinMode(D5,OUTPUT);pinMode(D6,OUTPUT);pinMode(D7,OUTPUT);pinMode(D8,OUTPUT);pinMode(D0,OUTPUT); 
+  GPOC = (1 << 14);GPOC = (1 << 12);GPOC = (1 << 13);GPOC = (1 << 15);
+  digitalWrite(D0,LOW); 
+  Serial.begin(115200);
+  Blynk.begin(auth, ssid, pass);
+  UDP.begin(9999);
+  delay(6000);
   Wire.begin();    
   Wire.setClock(400000);
   Wire.beginTransmission(0x68);                                        
@@ -119,7 +133,6 @@ delay(6000);
   Wire.write(0x1A);                                            
   Wire.write(0x03);                                            
   Wire.endTransmission();
-//____________________________________________________________________//  
   for (int cal_int = 0; cal_int < 4000 ; cal_int ++){  
     if(cal_int % 125 == 0)Serial.print(".");                                           
     Wire.beginTransmission(0x68);                                       
@@ -142,15 +155,14 @@ delay(6000);
   gyro_x_cal /= 4000;                                                 
   gyro_y_cal /= 4000;                                                 
   gyro_z_cal /= 4000; 
-timer1_attachInterrupt(PWM_callback);
-timer1_enable(TIM_DIV1, TIM_EDGE, TIM_SINGLE);
+  timer1_attachInterrupt(PWM_callback);
+  timer1_enable(TIM_DIV1, TIM_EDGE, TIM_SINGLE);
 }
 
 void loop() {
-//--------------------------------MPU6050----------------------------//    
-timePrev = Time;                   
-Time = micros();  
-elapsedTime = (float)(Time - timePrev) / (float)1000000;
+  Blynk.run();
+  Time = micros();  
+  elapsedTime = (float)(Time - timePrev) / (float)1000000;
   Wire.beginTransmission(0x68);                                       
   Wire.write(0x3B);                                                  
   Wire.endTransmission();                                             
@@ -191,13 +203,11 @@ elapsedTime = (float)(Time - timePrev) / (float)1000000;
   angle_roll_output = angle_roll_output * 0.9 + angle_roll * 0.1;  
   angle_yaw_output = angle_yaw_output * 0.9 + angle_yaw * 0.1;
 
-
-//--------------------------PID_Calculation--------------------------// 
-if(wall_car_init==false){
-  roll_desired_angle = 3*(input_ROLL - 50)/10.0;
-  pitch_desired_angle = 3*(input_PITCH - 50)/10.0;
-} 
-P_factor = 0.001286376*input_THROTTLE + 0.616932;
+  if(wall_car_init==false){
+    roll_desired_angle = 3*(input_ROLL - 50)/10.0;
+    pitch_desired_angle = 3*(input_PITCH - 50)/10.0;
+  } 
+  P_factor = 0.001286376*input_THROTTLE + 0.616932;
 
   roll_error =  angle_roll_output - roll_desired_angle;
   pitch_error = angle_pitch_output - pitch_desired_angle;  
@@ -231,27 +241,6 @@ P_factor = 0.001286376*input_THROTTLE + 0.616932;
   ESCout_3 = input_THROTTLE - pitch_PID + roll_PID + yaw_PID;
   ESCout_4 = input_THROTTLE - pitch_PID - roll_PID - yaw_PID;
 
-//------------------------- CarMode -----------------------------//
-if(Mode==1 && (abs(input_ROLL-50)>30 || abs(input_PITCH-50)>30)){
-  wall_car_init = true;
-       if(input_ROLL > 30){target_axis = 1; target_dirr = 1;}
-  else if(input_ROLL < -30){target_axis = 1; target_dirr = -1;}
-  else if(input_PITCH > 30){target_axis = 2; target_dirr = 1;}
-  else if(input_PITCH < -30){target_axis = 2; target_dirr = -1;}
-}
-else if(Mode==0){wall_car_init=false;set_motor_const_speed=false;}
-
-if(wall_car_init==true){
-  if(target_axis=1){roll_desired_angle = 90*target_dirr;}
-  else if(target_axis=2){pitch_desired_angle = 90*target_dirr;}
-  if((abs(acceleration_x)<15 && abs(acceleration_y)<15) && (abs(angle_roll_output)>45 || abs(angle_pitch_output)>45)){set_motor_const_speed = true;}
-  if(set_motor_const_speed==true){
-    ESCout_1 = 1100; ESCout_2 = 1103; ESCout_3 = 1106; ESCout_4 = 1109;
-    if(input_ROLL>50 && wheal_state == true){digitalWrite(D0,HIGH);}
-    }
-}
-//----------------------------------------------------------------//
-
   if(ESCout_1>1199) ESCout_1=1199;
   else if(ESCout_1<1) ESCout_1=1;
   if(ESCout_2>1199) ESCout_2=1199;
@@ -261,8 +250,7 @@ if(wall_car_init==true){
   if(ESCout_4>1199) ESCout_4=1199;
   else if(ESCout_4<1) ESCout_4=1;
 
-//----------------------------- Sorting -------------------------------// 
-arr[0]=ESCout_1;arr[1]=ESCout_2;arr[2]=ESCout_3;arr[3]=ESCout_4; 
+  arr[0]=ESCout_1;arr[1]=ESCout_2;arr[2]=ESCout_3;arr[3]=ESCout_4; 
   temp_arr[0] = arr[0];temp_arr[1] = arr[1];temp_arr[2] = arr[2];temp_arr[3] = arr[3];
   for (i = 0; i < 3; i++){
     temp_i = i;
@@ -294,8 +282,6 @@ arr[0]=ESCout_1;arr[1]=ESCout_2;arr[2]=ESCout_3;arr[3]=ESCout_4;
     else if(temp_arr[2] == arr[k] && orderState3 == false){ order[2] = k; orderState3=true;}
     else if(temp_arr[3] == arr[k] && orderState4 == false){ order[3] = k; orderState4=true;}
   }
-
-//----------------------------- WiFi ----------------------------------//
   int packetSize = UDP.parsePacket();
   if (packetSize) {
     int len = UDP.read(packet, 4);
@@ -305,25 +291,16 @@ arr[0]=ESCout_1;arr[1]=ESCout_2;arr[2]=ESCout_3;arr[3]=ESCout_4;
     input_THROTTLE = int(packet[2])*24;    
     Mode = int(packet[3]); 
   }
-if(input_THROTTLE == 0){
-  angle_yaw_output=0;angle_yaw=0;yaw_PID=0;
-  yaw_pid_p=0;yaw_pid_i=0;yaw_pid_d=0;twoX_ki=0;
+  if(input_THROTTLE == 0){
+    angle_yaw_output=0;angle_yaw=0;yaw_PID=0;
+    yaw_pid_p=0;yaw_pid_i=0;yaw_pid_d=0;twoX_ki=0;
   }
-//-------------------------------------------------------------------// 
+  if(wheal_state == false){digitalWrite(D0,LOW);}
 
-//Serial.print(input_ROLL);Serial.print(" ");
-//Serial.print(input_PITCH);Serial.print(" ");
-//Serial.print(input_THROTTLE);Serial.print(" ");
-//Serial.print(angle_roll_output,0);Serial.print(" ");
-//Serial.print(angle_pitch_output,0);//Serial.print(" ");
-//Serial.println(input_THROTTLE);
-
-if(wheal_state == false){digitalWrite(D0,LOW);}
-
-if(Timer_Init == false){
-  timer1_write(80);
-  Timer_Init = true;
-}
-wheal_state = !wheal_state;
-while(Time - timePrev <1200);  
+  if(Timer_Init == false){
+    timer1_write(80);
+    Timer_Init = true;
+  }
+  wheal_state = !wheal_state;
+  while(Time - timePrev <1200);  
 }
