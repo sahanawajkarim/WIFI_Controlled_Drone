@@ -7,9 +7,7 @@
 #include <WiFiUdp.h>
 #include <BlynkSimpleEsp8266.h>
 
-char auth[] = "89-_kWDCOyl8byyjeemw1VtLSPF3Lexg"; // Your Blynk Auth Token
-char ssid[] = "vivo14";  // Your WiFi SSID
-char pass[] = "123456789";  // Your WiFi Password
+
 
 WiFiUDP UDP;
 char packet[4];
