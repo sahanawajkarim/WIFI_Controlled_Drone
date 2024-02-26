@@ -1,10 +1,15 @@
+#define BLYNK_TEMPLATE_ID "TMPL32cEY-l2i"
+#define BLYNK_TEMPLATE_NAME "Final Drone last"
+#define BLYNK_AUTH_TOKEN "89-_kWDCOyl8byyjeemw1VtLSPF3Lexg"
+
 #include <Wire.h>
 #include <ESP8266WiFi.h>
+#include <WiFiUdp.h>
 #include <BlynkSimpleEsp8266.h>
 
-char auth[] = "YourAuthToken"; // Your Blynk Auth Token
-char ssid[] = "YourWiFiSSID";  // Your WiFi SSID
-char pass[] = "YourWiFiPassword";  // Your WiFi Password
+char auth[] = "89-_kWDCOyl8byyjeemw1VtLSPF3Lexg"; // Your Blynk Auth Token
+char ssid[] = "vivo14";  // Your WiFi SSID
+char pass[] = "123456789";  // Your WiFi Password
 
 WiFiUDP UDP;
 char packet[4];
@@ -15,6 +20,12 @@ int input_ROLL = 50;
 int input_YAW = 50;
 volatile int input_THROTTLE = 0;
 int Mode = 0;
+
+int D8 =15;
+int D6 =12;
+int D5 =14;
+int D0 =16;
+int temp_i;
 
 boolean wall_car_init = false;
 boolean set_motor_const_speed = false;
@@ -29,7 +40,7 @@ int temp_arr[] = {0,0,0,0};
 int pulldown_time_temp[] = {0,0,0,0,0};
 int pulldown_time[] = {0,0,0,0,0};
 volatile int pulldown_time_temp_loop[] = {0,0,0,0,0}; //volatile key
-uint8_t pin[] = {14,12,13,15};
+uint8_t pin[] = {15,12,14,16};
 int i,j,temp;
 boolean orderState1,orderState2,orderState3,orderState4,Timer_Init;
 
@@ -81,7 +92,7 @@ void ICACHE_RAM_ATTR PWM_callback() {
       pulldown_time_temp[3] = pulldown_time_temp_loop[3];
       pulldown_time_temp[4] = pulldown_time_temp_loop[4];
       pwm_stops = 1;
-      if(input_THROTTLE!=0){GPOS = (1 << 14);GPOS = (1 << 12);GPOS = (1 << 15);GPOS = (1 << 13);}
+      if(input_THROTTLE!=0){GPOS = (1 << 15);GPOS = (1 << 12);GPOS = (1 << 16);GPOS = (1 << 14);}
       timer1_write(80*pulldown_time_temp[0]);
       break;
     case 1:
@@ -107,11 +118,12 @@ void ICACHE_RAM_ATTR PWM_callback() {
   }
 }
 
+
 void setup() {
-  pinMode(D5,OUTPUT);pinMode(D6,OUTPUT);pinMode(D7,OUTPUT);pinMode(D8,OUTPUT);pinMode(D0,OUTPUT); 
-  GPOC = (1 << 14);GPOC = (1 << 12);GPOC = (1 << 13);GPOC = (1 << 15);
-  digitalWrite(D0,LOW); 
-  Serial.begin(115200);
+  pinMode(D8,OUTPUT);pinMode(D6,OUTPUT);pinMode(D5,OUTPUT);pinMode(D0,OUTPUT); 
+  GPOC = (1 << 15);GPOC = (1 << 12);GPOC = (1 << 14);GPOC = (1 << 16);
+
+  Serial.begin(116200);
   Blynk.begin(auth, ssid, pass);
   UDP.begin(9999);
   delay(6000);
@@ -138,8 +150,8 @@ void setup() {
     Wire.beginTransmission(0x68);                                       
     Wire.write(0x3B);                                                  
     Wire.endTransmission();                                             
-    Wire.requestFrom(0x68,14);                                        
-    while(Wire.available() < 14);                                        
+    Wire.requestFrom(0x68,15);                                        
+    while(Wire.available() < 15);                                        
     acc_y = Wire.read()<<8|Wire.read();                               
     acc_x = Wire.read()<<8|Wire.read();                               
     acc_z = Wire.read()<<8|Wire.read();                                 
@@ -166,8 +178,8 @@ void loop() {
   Wire.beginTransmission(0x68);                                       
   Wire.write(0x3B);                                                  
   Wire.endTransmission();                                             
-  Wire.requestFrom(0x68,14);                                        
-  while(Wire.available() < 14);                                        
+  Wire.requestFrom(0x68,15);                                        
+  while(Wire.available() < 15);                                        
   acc_y = Wire.read()<<8|Wire.read();                               
   acc_x = Wire.read()<<8|Wire.read();                               
   acc_z = Wire.read()<<8|Wire.read();                                 
@@ -295,7 +307,7 @@ void loop() {
     angle_yaw_output=0;angle_yaw=0;yaw_PID=0;
     yaw_pid_p=0;yaw_pid_i=0;yaw_pid_d=0;twoX_ki=0;
   }
-  if(wheal_state == false){digitalWrite(D0,LOW);}
+
 
   if(Timer_Init == false){
     timer1_write(80);
